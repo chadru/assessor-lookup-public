@@ -1,0 +1,46 @@
+[build-system]
+requires = ["setuptools>=77"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "assessor-lookup"
+version = "0.1.0"
+description = "Automated county assessor public-records search for real-estate appraisers"
+readme = "README.md"
+license = "MIT"
+authors = [{ name = "Chad Ruby" }]
+requires-python = ">=3.9"
+keywords = ["appraisal", "assessor", "public-records", "real-estate", "county"]
+classifiers = [
+    "Development Status :: 4 - Beta",
+    "Intended Audience :: Other Audience",
+    "Programming Language :: Python :: 3",
+    "Topic :: Office/Business",
+]
+dependencies = []
+
+[project.optional-dependencies]
+card = ["playwright>=1.40"]
+mcp = ["mcp>=1.3"]
+dev = ["pytest>=7"]
+
+[project.scripts]
+assessor-lookup = "assessor_lookup.cli:main"
+assessor-lookup-mcp = "assessor_lookup.mcp_server:main"
+
+[project.urls]
+Homepage = "https://github.com/chadru/assessor-lookup-public"
+Repository = "https://github.com/chadru/assessor-lookup-public"
+Issues = "https://github.com/chadru/assessor-lookup-public/issues"
+
+[tool.setuptools]
+packages = ["assessor_lookup"]
+
+[tool.setuptools.package-data]
+assessor_lookup = ["county_registry.json", "golden_records.json", "architecture.md"]
+
+[tool.pytest.ini_options]
+testpaths = ["tests"]
+markers = [
+    "network: tests that hit live county APIs (deselect with -m 'not network')",
+]

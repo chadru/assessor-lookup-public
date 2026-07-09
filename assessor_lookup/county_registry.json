@@ -1,0 +1,9 @@
+{
+  "CO:El Paso": {"platform": "spatialest", "slug": "elpaso", "state": "co"},
+  "CO:Denver": {"platform": "spatialest", "slug": "denver", "state": "co"},
+  "CO:Douglas": {"platform": "spatialest", "slug": "douglas", "state": "co"},
+  "CO:Jefferson": {"platform": "jeffco", "state": "co"},
+  "CO:Arapahoe": {"platform": "arapahoe", "state": "co"},
+  "CO:Adams": {"platform": "adams", "state": "co"},
+  "CO:Clear Creek": {"platform": "eagleweb", "base": "https://assessor.co.clear-creek.co.us/eagleassessor", "state": "co"}
+}

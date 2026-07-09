@@ -1,0 +1,11 @@
+include AGENTS.md
+include CLAUDE.md
+include README.md
+include SECURITY.md
+include LICENSE
+include .mcp.json
+recursive-include .agents *.md
+recursive-include .claude *.md
+recursive-include .codex *.toml
+recursive-include assessor_lookup *.json *.md
+recursive-include tests *.py

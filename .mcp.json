@@ -1,0 +1,9 @@
+{
+  "mcpServers": {
+    "assessor-lookup": {
+      "command": "assessor-lookup-mcp",
+      "args": [],
+      "env": {}
+    }
+  }
+}

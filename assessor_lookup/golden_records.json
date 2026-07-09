@@ -1,0 +1,109 @@
+{
+  "adams-parcel": {
+    "captured_at": "2026-07-09T21:19:22+00:00",
+    "elapsed_s": 1.61,
+    "expect": {
+      "above_grade_sqft": null,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "0156931101001",
+      "year_built": null
+    },
+    "platform": "adams"
+  },
+  "arapahoe-address": {
+    "captured_at": "2026-07-09T21:19:21+00:00",
+    "elapsed_s": 0.39,
+    "expect": {
+      "above_grade_sqft": 113208,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "2077-16-2-00-045",
+      "year_built": 1976
+    },
+    "platform": "arapahoe"
+  },
+  "boulder-baseline": {
+    "captured_at": "2026-07-09T21:19:35+00:00",
+    "elapsed_s": 0.46,
+    "expect": {
+      "above_grade_sqft": null,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "146330357002",
+      "year_built": null
+    },
+    "platform": "co_parcel_api"
+  },
+  "clearcreek-account": {
+    "captured_at": "2026-07-09T21:19:35+00:00",
+    "elapsed_s": 6.05,
+    "expect": {
+      "parcel_number": "1959-172-22-900"
+    },
+    "platform": "eagleweb"
+  },
+  "clearcreek-address": {
+    "captured_at": "2026-07-09T21:19:29+00:00",
+    "elapsed_s": 6.22,
+    "expect": {
+      "parcel_number": "1959-172-22-900"
+    },
+    "platform": "eagleweb"
+  },
+  "denver-parcel": {
+    "captured_at": "2026-07-09T21:19:14+00:00",
+    "elapsed_s": 1.01,
+    "expect": {
+      "above_grade_sqft": 473228,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "0503321005000",
+      "year_built": 1993
+    },
+    "platform": "spatialest"
+  },
+  "douglas-parcel": {
+    "captured_at": "2026-07-09T21:19:16+00:00",
+    "elapsed_s": 1.79,
+    "expect": {
+      "above_grade_sqft": 51722,
+      "basement_sqft": null,
+      "baths": 0.0,
+      "beds": 0,
+      "parcel_number": "R0404064",
+      "year_built": null
+    },
+    "platform": "spatialest"
+  },
+  "elpaso-address": {
+    "captured_at": "2026-07-09T21:19:13+00:00",
+    "elapsed_s": 1.01,
+    "expect": {
+      "above_grade_sqft": null,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "7326201002",
+      "year_built": 2000
+    },
+    "platform": "spatialest"
+  },
+  "jeffco-address": {
+    "captured_at": "2026-07-09T21:19:20+00:00",
+    "elapsed_s": 3.9,
+    "expect": {
+      "above_grade_sqft": 91734,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "39-113-00-017",
+      "year_built": 1978
+    },
+    "platform": "jeffco"
+  }
+}
