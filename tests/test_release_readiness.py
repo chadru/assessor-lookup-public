@@ -174,6 +174,46 @@ def test_candidate_matching_accepts_unique_parcel_after_normalization():
     assert status == "success"
 
 
+def test_candidate_matching_reads_identity_above_empty_attributes():
+    # Live ArcGIS geocoders return "attributes": {} alongside top-level
+    # address/score; the empty dict must not hide the candidate's identity.
+    candidate, status = select_candidate(
+        [{"address": "123 Main St, Denver, CO", "score": 99,
+          "location": {"x": 1, "y": 2}, "attributes": {}},
+         {"address": "999 Other St, Denver, CO", "score": 92,
+          "location": {"x": 3, "y": 4}, "attributes": {}}],
+        address="123 Main St")
+    assert status == "success"
+    assert candidate is not None
+    assert candidate["address"] == "123 Main St, Denver, CO"
+
+
+def test_candidate_matching_collapses_duplicate_address_matches():
+    # Composite locators (e.g. Arapahoe's) return the same address once per
+    # underlying locator; duplicates of one identity are not ambiguity.
+    candidate, status = select_candidate(
+        [{"address": "1082 S NUCLA ST, AURORA, 80017", "score": 99.31,
+          "location": {"x": 1, "y": 2}},
+         {"address": "1082 S NUCLA ST, AURORA, 80017", "score": 99.31,
+          "location": {"x": 1, "y": 2}},
+         {"address": "1082 S NUCLA ST, Aurora, 80017", "score": 99.8,
+          "location": {"x": 1, "y": 2}}],
+        address="1082 S Nucla Street, Aurora, CO 80017")
+    assert status == "success"
+    assert candidate is not None
+    assert candidate["score"] == 99.8  # best-scored duplicate wins
+
+
+def test_candidate_matching_keeps_conflicting_parcels_ambiguous():
+    # Two different parcels sharing one situs address stay ambiguous.
+    candidate, status = select_candidate(
+        [{"attributes": {"situsAdd": "123 Main St", "parcel_id": "1"}},
+         {"attributes": {"situsAdd": "123 Main St", "parcel_id": "2"}}],
+        address="123 Main St")
+    assert candidate is None
+    assert status == "ambiguous"
+
+
 def test_adams_search_selects_exact_candidate():
     response = {"features": [
         {"attributes": {"PIN": "wrong", "concataddr1": "123 Main Ct"}},
@@ -205,6 +245,22 @@ def test_arapahoe_geocoder_selects_exact_candidate():
     with patch("assessor_lookup.assessor_arapahoe._arcgis_get",
                return_value=response):
         assert ArapahoeClient()._geocode("123 Main St") == ((3, 4), "success")
+
+
+def test_arapahoe_owner_query_keys_on_parcel_id():
+    # Envelope-based owner lookup returned whichever neighbor came first;
+    # the owner layer must be keyed on the already-resolved PARCEL_ID.
+    response = {"features": [
+        {"attributes": {"PARCEL_ID": "1975-17-4-10-030", "Owner": "NEIGHBOR"}},
+        {"attributes": {"PARCEL_ID": "1975-17-4-10-031", "Owner": "SUBJECT"}},
+    ]}
+    with patch("assessor_lookup.assessor_arapahoe._arcgis_get",
+               return_value=response) as request:
+        out = ArapahoeClient()._query_owner("1975-17-4-10-031")
+    assert out["Owner"] == "SUBJECT"
+    assert "PARCEL_ID" in request.call_args.kwargs.get(
+        "params", request.call_args.args[1] if len(request.call_args.args) > 1
+        else {}).get("where", "")
 
 
 def test_eagleweb_refuses_multiple_address_accounts():

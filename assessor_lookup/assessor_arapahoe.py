@@ -83,13 +83,14 @@ class ArapahoeClient:
 
         parcel_id = parcel.get("PARCEL_ID") or parcel.get("PARCELID") or ""
 
-        # Step 3: Spatial query Layer 277 for real owner (not metro district)
+        # Step 3: Query Layer 277 by parcel id for real owner (not metro district)
         owner_data = {}
-        try:
-            owner_data = self._query_owner(x, y)
-        except Exception as e:
-            if self.verbose:
-                logger.warning("Arapahoe owner query failed: %s", e)
+        if parcel_id:
+            try:
+                owner_data = self._query_owner(parcel_id)
+            except Exception as e:
+                if self.verbose:
+                    logger.warning("Arapahoe owner query failed: %s", e)
 
         # Step 4: Query Layer 286 for building data
         building = {}
@@ -347,15 +348,15 @@ class ArapahoeClient:
             return features[0].get("attributes", {})
         return {}
 
-    def _query_owner(self, x, y):
-        """Spatial query Layer 277 for actual owner at (x, y)."""
-        buf = 0.0005
-        envelope = f"{x - buf},{y - buf},{x + buf},{y + buf}"
+    def _query_owner(self, parcel_id):
+        """Query Layer 277 for the actual owner (not metro district).
+
+        Keyed on PARCEL_ID: a spatial envelope around a geocoded point
+        intersects a dozen neighboring parcels, and taking the first
+        feature returned a neighbor's owner.
+        """
         result = _arcgis_get(OWNER_LAYER_URL, params={
-            "geometry": envelope,
-            "geometryType": "esriGeometryEnvelope",
-            "spatialRel": "esriSpatialRelIntersects",
-            "inSR": "4326",
+            "where": f"PARCEL_ID='{parcel_id}'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -363,7 +364,9 @@ class ArapahoeClient:
 
         features = result.get("features", [])
         if features:
-            return features[0].get("attributes", {})
+            candidate, _ = select_candidate(features, parcel=parcel_id)
+            if candidate:
+                return candidate.get("attributes", candidate)
         return {}
 
     def _query_improvements(self, parcel_id):
