@@ -32,3 +32,16 @@ exports remain in the user's local configuration or chosen data directory and
 must not be committed to the repository. On POSIX systems, onboarding enforces
 mode `0700` on its configuration directory and `0600` on property-data files,
 including remediation of existing files.
+
+## Registry trust boundary
+
+The county registry (packaged `county_registry.json` plus the per-user file in
+`~/.config/assessor-lookup/`, or `ASSESSOR_LOOKUP_HOME`) is **trusted local
+configuration**. Entries select which platform module handles a jurisdiction
+and, for some platforms, the base URL the client talks to (validated to
+public HTTPS hosts by `core/network.py`). Anyone who can write that file can
+redirect lookups to a public HTTPS host of their choosing, so treat it like
+any other local config file. Entries never contain credentials; ArcGIS driver
+names are validated against a strict module-path pattern before import, and
+malformed or unrecognized entries surface as explicit `api_error` lookup
+results rather than being silently used.

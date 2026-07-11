@@ -10,7 +10,7 @@
       "parcel_number": "0156931101001",
       "year_built": null
     },
-    "platform": "adams"
+    "platform": "arcgis/us.co.adams"
   },
   "arapahoe-address": {
     "captured_at": "2026-07-09T21:19:21+00:00",
@@ -23,7 +23,7 @@
       "parcel_number": "2077-16-2-00-045",
       "year_built": 1976
     },
-    "platform": "arapahoe"
+    "platform": "arcgis/us.co.arapahoe"
   },
   "boulder-baseline": {
     "captured_at": "2026-07-09T21:19:35+00:00",
@@ -36,7 +36,7 @@
       "parcel_number": "146330357002",
       "year_built": null
     },
-    "platform": "co_parcel_api"
+    "platform": "arcgis/us.co.statewide"
   },
   "clearcreek-account": {
     "captured_at": "2026-07-09T21:19:35+00:00",
@@ -53,6 +53,19 @@
       "parcel_number": "1959-172-22-900"
     },
     "platform": "eagleweb"
+  },
+  "denver-address": {
+    "captured_at": "2026-07-11T08:46:00+00:00",
+    "elapsed_s": 5.58,
+    "expect": {
+      "above_grade_sqft": 473228,
+      "basement_sqft": null,
+      "baths": null,
+      "beds": null,
+      "parcel_number": "0503321005000",
+      "year_built": 1993
+    },
+    "platform": "spatialest"
   },
   "denver-parcel": {
     "captured_at": "2026-07-09T21:19:14+00:00",
@@ -104,6 +117,6 @@
       "parcel_number": "39-113-00-017",
       "year_built": 1978
     },
-    "platform": "jeffco"
+    "platform": "aumentum"
   }
 }

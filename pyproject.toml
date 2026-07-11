@@ -33,8 +33,8 @@ Homepage = "https://github.com/chadru/assessor-lookup-public"
 Repository = "https://github.com/chadru/assessor-lookup-public"
 Issues = "https://github.com/chadru/assessor-lookup-public/issues"
 
-[tool.setuptools]
-packages = ["assessor_lookup"]
+[tool.setuptools.packages.find]
+include = ["assessor_lookup*"]
 
 [tool.setuptools.package-data]
 assessor_lookup = ["county_registry.json", "golden_records.json", "architecture.md"]

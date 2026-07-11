@@ -2,7 +2,7 @@
 
 This is the tier-2 *baseline* source used by auto-discovery when a county has
 no dedicated assessor client. It is a single statewide ArcGIS layer that covers
-~30 Colorado counties and returns clean JSON — but only the parcel/owner/legal/
+~40 Colorado counties and returns clean JSON — but only the parcel/owner/legal/
 value/land attributes. It has **no building characteristics** (GLA, beds, baths,
 year built, basement), so those come back as None and the discrepancy check
 shows them as N/A. Its assessed/actual values also lag the county's live system,
@@ -11,15 +11,12 @@ so treat them as approximate.
 For full building data a county needs a real client (Spatialest, EagleWeb, ...).
 """
 
-import json
 import urllib.error
-import urllib.parse
-import urllib.request
 
-from .matching import select_candidate
-from .network import open_https, require_https_url
+from ....core.matching import select_candidate
+from ....platforms import arcgis
 
-_UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
+_ALLOWED_HOSTS = ("gis.colorado.gov",)
 
 # Colorado_Public_Parcel_Composite, layer 0
 QUERY_URL = ("https://gis.colorado.gov/public/rest/services/Address_and_Parcel/"
@@ -34,13 +31,13 @@ _NOTE = ("Baseline parcel API (CO statewide) — no building data (GLA/beds/bath
          "year); values approximate. Add a county client for full records.")
 
 
-def _esc(value):
-    """Escape a value for an ArcGIS SQL string literal."""
-    return str(value or "").replace("'", "''")
+_esc = arcgis.escape_sql_literal
 
 
 class CoParcelClient:
     """Baseline client backed by the CO statewide public-parcel layer."""
+
+    capabilities = {"parcel_lookup": True, "building_fields": False}
 
     def __init__(self, county="", state="co", timeout=15, verbose=False):
         self.county = county
@@ -77,18 +74,13 @@ class CoParcelClient:
 
     # -- internals -------------------------------------------------------
     def _query(self, where, ident):
-        url = QUERY_URL + "?" + urllib.parse.urlencode({
-            "where": where, "outFields": _OUT_FIELDS,
-            "resultRecordCount": "10", "f": "json"})
-        url = require_https_url(url, allowed_hosts=("gis.colorado.gov",))
         try:
             if self.verbose:
                 print(f"  CO parcel API: {where}")
-            req = urllib.request.Request(url, headers=_UA)
-            with open_https(
-                    req, timeout=self.timeout,
-                    allowed_hosts=("gis.colorado.gov",)) as r:
-                data = json.loads(r.read().decode("utf-8", "ignore"))
+            data = arcgis.arcgis_get(QUERY_URL, _ALLOWED_HOSTS, params={
+                "where": where, "outFields": _OUT_FIELDS,
+                "resultRecordCount": "10", "f": "json",
+            }, timeout=self.timeout)
         except urllib.error.URLError as e:
             status = "timeout" if "timed out" in str(e).lower() else "api_error"
             return {"status": status, "error": str(e), **ident}
@@ -159,3 +151,11 @@ class CoParcelClient:
             "garage_area_sqft": None,
             "data_note": _NOTE,
         }
+
+
+def build(entry, timeout=15, verbose=False):
+    """Driver factory: the statewide layer serves many CO counties, so the
+    county name comes from the entry's jurisdiction."""
+    jur = entry["jurisdiction"]
+    return CoParcelClient(county=jur["name"], state=jur["state"].lower(),
+                          timeout=timeout, verbose=verbose)

@@ -38,7 +38,7 @@ except ImportError as e:  # pragma: no cover
     ) from e
 
 from . import lookup as _lookup
-from .assessor import _load_registry, save_discovered_entry
+from .registry import load_registry as _load_registry, save_discovered_entry
 from .checker import check_public_records, print_discrepancy_report  # noqa: F401
 from .discovery import discover_county as _discover_county
 
@@ -115,8 +115,9 @@ subset — that's the source's data, not a bug. Say so honestly.
 **Add a new county** (use the `add_new_county` prompt for the full script):
 1. `discover_county` — does a supported source already resolve?
 2. If not, delegate site-mapping to an explorer sub-agent; **API-first**.
-3. Implement a client (`assessor_<county>.py`) returning the standard record
-   dict with a `status` key; wire it into `checker._get_client` and the registry.
+3. Implement a client (`platforms/<name>.py`, or a `jurisdictions/` driver for
+   a bespoke ArcGIS flow) returning the standard record dict with a `status`
+   key; register it in the `PLATFORMS` dict and the registry.
 4. Add a golden case to `assessor_lookup/harness.py` and capture it (`--capture`).
 5. `run_regression` to confirm green; have the reviewer sub-agent verify.
 
@@ -254,7 +255,8 @@ def check_mls_csv(subject_csv: str, comps_csv: str = "", county: str = "",
 @mcp.tool(
     description="List every county the tool can serve right now: packaged "
     "defaults plus any auto-discovered counties cached for this user. Returns "
-    "the registry keyed by 'STATE:County' with each source's platform.")
+    "the registry keyed by '{COUNTRY}/{STATE}/{kind}:{name-slug}' (e.g. "
+    "'US/CO/county:el-paso') with each source's platform.")
 def list_counties() -> dict:
     reg = _load_registry()
     return {"counties": reg, "count": len(reg)}
@@ -389,7 +391,7 @@ def architecture() -> str:
 
 @mcp.resource("assessor://counties", mime_type="application/json",
               description="Current county registry (packaged defaults + "
-              "user-discovered), keyed by 'STATE:County'.")
+              "user-discovered), keyed by '{COUNTRY}/{STATE}/{kind}:{name-slug}'.")
 def counties_resource() -> str:
     return json.dumps(_load_registry(), indent=2, sort_keys=True)
 
@@ -473,12 +475,13 @@ def add_new_county(county: str, state: str = "co") -> str:
         f"service or vendor JSON; confirm it actually carries GLA/beds/baths/"
         f"year built. Only fall back to scraping the search+detail HTML if no "
         f"API has the building fields.\n"
-        f"3. Implement `assessor_<slug>.py` with a client whose `lookup` (and "
+        f"3. Implement the client in `platforms/<name>.py` (or a driver in "
+        f"`jurisdictions/<country>/<state>/`) whose `lookup` (and "
         f"ideally `lookup_by_parcel`) returns the standard record dict with a "
         f"`status` key. Mirror an existing client on the same platform family "
-        f"(Spatialest JSON, ArcGIS like assessor_adams.py, or scraped like "
-        f"assessor_eagleweb.py).\n"
-        f"4. Wire the platform into `checker._get_client` and add a "
+        f"(Spatialest JSON, ArcGIS like jurisdictions/us/co/adams.py, or scraped like "
+        f"platforms/eagleweb.py).\n"
+        f"4. Register the platform with one line in the `PLATFORMS` dict and add a "
         f"`county_registry.json` entry.\n"
         f"5. Add a golden case to `DEFAULT_CASES` in `assessor_lookup/harness.py`, then "
         f"`python tests/harness.py --capture --filter <id>`.\n"

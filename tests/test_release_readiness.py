@@ -6,15 +6,15 @@ from unittest.mock import patch
 import urllib.request
 
 from assessor_lookup import cli
-from assessor_lookup.assessor_adams import AdamsClient
-from assessor_lookup.assessor_arapahoe import ArapahoeClient
-from assessor_lookup.assessor_coparcel import CoParcelClient
-from assessor_lookup.assessor_eagleweb import EagleWebClient
-from assessor_lookup.assessor_jeffco import JeffcoClient
-from assessor_lookup.assessor import SpatialestClient
+from assessor_lookup.jurisdictions.us.co.adams import AdamsClient
+from assessor_lookup.jurisdictions.us.co.arapahoe import ArapahoeClient
+from assessor_lookup.jurisdictions.us.co.statewide import CoParcelClient
+from assessor_lookup.platforms.eagleweb import EagleWebClient
+from assessor_lookup.platforms.aumentum import JeffcoClient
+from assessor_lookup.platforms.spatialest import SpatialestClient
 from assessor_lookup.checker import _extract_mls_fields, detect_county
-from assessor_lookup.matching import select_candidate
-from assessor_lookup.network import (
+from assessor_lookup.core.matching import select_candidate
+from assessor_lookup.core.network import (
     SameOriginHTTPSRedirectHandler,
     require_https_url,
 )
@@ -44,7 +44,7 @@ def test_outbound_url_guard_rejects_unsafe_targets():
 
 def test_outbound_url_guard_rejects_local_dns_result():
     fake = [(2, 1, 6, "", ("127.0.0.1", 443))]
-    with patch("assessor_lookup.network.socket.getaddrinfo",
+    with patch("assessor_lookup.core.network.socket.getaddrinfo",
                return_value=fake):
         try:
             require_https_url("https://public-looking.example/path",
@@ -113,7 +113,7 @@ def test_spatialest_selects_exact_normalized_address_match():
         {"id": "right", "parcelactive": True, "address": "123 Main Street"},
     ]}
     card = {"parcel": {"header": {}, "sections": {}}}
-    with patch("assessor_lookup.assessor._spatialest_request",
+    with patch("assessor_lookup.platforms.spatialest._spatialest_request",
                side_effect=[search, card]):
         out = SpatialestClient().lookup("123 Main St")
 
@@ -126,7 +126,7 @@ def test_spatialest_refuses_ambiguous_candidates_without_addresses():
         {"id": "one", "parcelactive": True},
         {"id": "two", "parcelactive": True},
     ]}
-    with patch("assessor_lookup.assessor._spatialest_request",
+    with patch("assessor_lookup.platforms.spatialest._spatialest_request",
                return_value=search) as request:
         out = SpatialestClient().lookup("123 Main St")
 
@@ -136,7 +136,7 @@ def test_spatialest_refuses_ambiguous_candidates_without_addresses():
 
 def test_spatialest_refuses_direct_id_with_exposed_wrong_address():
     search = {"id": "wrong", "address": "999 Other St"}
-    with patch("assessor_lookup.assessor._spatialest_request",
+    with patch("assessor_lookup.platforms.spatialest._spatialest_request",
                return_value=search) as request:
         out = SpatialestClient().lookup("123 Main St")
     assert out["status"] == "not_found"
@@ -146,14 +146,14 @@ def test_spatialest_refuses_direct_id_with_exposed_wrong_address():
 def test_spatialest_validates_identityless_hit_against_card_address():
     card = {"parcel": {"header": {"FullAddress": "999 Other St"},
                        "sections": {}}}
-    with patch("assessor_lookup.assessor._spatialest_request",
+    with patch("assessor_lookup.platforms.spatialest._spatialest_request",
                side_effect=[{"results": [{"id": "one"}]}, card]):
         out = SpatialestClient().lookup("123 Main St")
     assert out["status"] == "not_found"
 
 
 def test_spatialest_malformed_card_returns_parse_error():
-    with patch("assessor_lookup.assessor._spatialest_request",
+    with patch("assessor_lookup.platforms.spatialest._spatialest_request",
                side_effect=[{"id": "one"}, []]):
         out = SpatialestClient().lookup("123 Main St")
     assert out["status"] == "parse_error"
@@ -219,7 +219,7 @@ def test_adams_search_selects_exact_candidate():
         {"attributes": {"PIN": "wrong", "concataddr1": "123 Main Ct"}},
         {"attributes": {"PIN": "right", "concataddr1": "123 Main Street"}},
     ]}
-    with patch("assessor_lookup.assessor_adams._arcgis_get",
+    with patch("assessor_lookup.jurisdictions.us.co.adams._arcgis_get",
                return_value=response):
         parcel, status = AdamsClient()._search_parcel("123 Main St")
     assert status == "success"
@@ -242,7 +242,7 @@ def test_arapahoe_geocoder_selects_exact_candidate():
         {"address": "123 Main Street, Denver, CO", "score": 95,
          "location": {"x": 3, "y": 4}},
     ]}
-    with patch("assessor_lookup.assessor_arapahoe._arcgis_get",
+    with patch("assessor_lookup.jurisdictions.us.co.arapahoe._arcgis_get",
                return_value=response):
         assert ArapahoeClient()._geocode("123 Main St") == ((3, 4), "success")
 
@@ -254,7 +254,7 @@ def test_arapahoe_owner_query_keys_on_parcel_id():
         {"attributes": {"PARCEL_ID": "1975-17-4-10-030", "Owner": "NEIGHBOR"}},
         {"attributes": {"PARCEL_ID": "1975-17-4-10-031", "Owner": "SUBJECT"}},
     ]}
-    with patch("assessor_lookup.assessor_arapahoe._arcgis_get",
+    with patch("assessor_lookup.jurisdictions.us.co.arapahoe._arcgis_get",
                return_value=response) as request:
         out = ArapahoeClient()._query_owner("1975-17-4-10-031")
     assert out["Owner"] == "SUBJECT"
@@ -290,7 +290,7 @@ def test_coparcel_refuses_multiple_nonmatching_features():
         {"attributes": {"situsAdd": "123 Main Ct", "parcel_id": "1"}},
         {"attributes": {"situsAdd": "999 Other St", "parcel_id": "2"}},
     ]}
-    response = patch("assessor_lookup.assessor_coparcel.open_https")
+    response = patch("assessor_lookup.platforms.arcgis.open_https")
     with response as urlopen:
         urlopen.return_value.__enter__.return_value.read.return_value = (
             json.dumps(payload).encode())
@@ -299,7 +299,7 @@ def test_coparcel_refuses_multiple_nonmatching_features():
 
 
 def test_coparcel_malformed_json_shape_returns_parse_error():
-    response = patch("assessor_lookup.assessor_coparcel.open_https")
+    response = patch("assessor_lookup.platforms.arcgis.open_https")
     with response as urlopen:
         urlopen.return_value.__enter__.return_value.read.return_value = b"[1]"
         out = CoParcelClient(county="Adams").lookup("123 Main St")

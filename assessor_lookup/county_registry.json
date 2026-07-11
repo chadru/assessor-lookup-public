@@ -1,9 +1,107 @@
 {
-  "CO:El Paso": {"platform": "spatialest", "slug": "elpaso", "state": "co"},
-  "CO:Denver": {"platform": "spatialest", "slug": "denver", "state": "co"},
-  "CO:Douglas": {"platform": "spatialest", "slug": "douglas", "state": "co"},
-  "CO:Jefferson": {"platform": "jeffco", "state": "co"},
-  "CO:Arapahoe": {"platform": "arapahoe", "state": "co"},
-  "CO:Adams": {"platform": "adams", "state": "co"},
-  "CO:Clear Creek": {"platform": "eagleweb", "base": "https://assessor.co.clear-creek.co.us/eagleassessor", "state": "co"}
+  "US/CO/county:adams": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "driver": "us.co.adams"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "Adams",
+      "state": "CO"
+    },
+    "platform": "arcgis"
+  },
+  "US/CO/county:arapahoe": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "driver": "us.co.arapahoe"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "Arapahoe",
+      "state": "CO"
+    },
+    "platform": "arcgis"
+  },
+  "US/CO/county:clear-creek": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "base": "https://assessor.co.clear-creek.co.us/eagleassessor"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "Clear Creek",
+      "state": "CO"
+    },
+    "platform": "eagleweb"
+  },
+  "US/CO/county:denver": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "slug": "denver"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "Denver",
+      "state": "CO"
+    },
+    "platform": "spatialest"
+  },
+  "US/CO/county:douglas": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "slug": "douglas"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "Douglas",
+      "state": "CO"
+    },
+    "platform": "spatialest"
+  },
+  "US/CO/county:el-paso": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "slug": "elpaso"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "El Paso",
+      "state": "CO"
+    },
+    "platform": "spatialest"
+  },
+  "US/CO/county:jefferson": {
+    "access": {
+      "mode": "public"
+    },
+    "config": {
+      "base": "https://propertysearch.jeffco.us/api"
+    },
+    "jurisdiction": {
+      "country": "US",
+      "kind": "county",
+      "name": "Jefferson",
+      "state": "CO"
+    },
+    "platform": "aumentum"
+  }
 }

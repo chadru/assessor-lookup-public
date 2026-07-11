@@ -30,6 +30,6 @@ A concise report the implementer can act on without redoing your work:
 - A clear verdict: **which building fields are available**, and whether this is
   an API client or a scrape. If building data isn't available anywhere, say so.
 
-Mirror an existing client on the same family: `assessor_adams.py` (ArcGIS
-JSON), `assessor.py` (Spatialest JSON), or `assessor_eagleweb.py` (scrape).
+Mirror an existing client on the same family: `jurisdictions/us/co/adams.py` (ArcGIS
+JSON driver), `platforms/spatialest.py` (Spatialest JSON), or `platforms/eagleweb.py` (scrape).
 Stay read-only — do not edit files."""

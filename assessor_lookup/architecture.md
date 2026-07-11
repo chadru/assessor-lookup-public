@@ -5,17 +5,26 @@ county-assessor record and can compare that record with MLS CSV data.
 
 ## Runtime layers
 
-1. `checker._get_client(county, state)` selects a county platform from the
-   packaged/user registry, using API-first discovery for unknown counties.
-2. Platform clients (`assessor.py`, `assessor_adams.py`,
-   `assessor_arapahoe.py`, `assessor_jeffco.py`, `assessor_eagleweb.py`, and
-   `assessor_coparcel.py`) return status-bearing dictionaries and never expose
-   transport exceptions to callers.
-3. `checker.check_public_records` normalizes PPMLS or RESO/REColorado rows,
+1. `registry.py` models jurisdictions with canonical keys
+   (`"US/CO/county:el-paso"`; `kind` covers county/parish/independent city)
+   and reads both the canonical and legacy `"CO:El Paso"` entry formats,
+   merging packaged defaults with the per-user registry. Credentials never
+   live in the registry.
+2. `checker._get_client(county, state)` resolves an entry (exact, then
+   state-scoped name match, then API-first discovery) and constructs the
+   client via the `PLATFORMS` dict in `platforms/__init__.py`.
+3. Platform clients (`platforms/spatialest.py`, `platforms/eagleweb.py`,
+   `platforms/aumentum.py`) carry no jurisdiction knowledge; bespoke ArcGIS
+   flows are jurisdiction drivers (`jurisdictions/us/co/adams.py`,
+   `arapahoe.py`, `statewide.py`) built on the shared primitives in
+   `platforms/arcgis.py`. All return status-bearing dictionaries, never
+   transport exceptions, and declare a `capabilities` dict
+   (`parcel_lookup`, `building_fields`).
+4. `checker.check_public_records` normalizes PPMLS or RESO/REColorado rows,
    prefers parcel lookup, and compares GLA, basement, beds, baths, and year.
-4. `harness.py` owns packaged golden regression, discovery checks, parser
+5. `harness.py` owns packaged golden regression, discovery checks, parser
    benchmarks, coverage probes, and per-user county onboarding.
-5. `mcp_server.py` exposes the same public functions, harness, resources, and
+6. `mcp_server.py` exposes the same public functions, harness, resources, and
    workflows over stdio MCP without duplicating lookup logic.
 
 ## Data-source policy

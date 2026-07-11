@@ -4,7 +4,8 @@ import logging
 import sys
 import time
 
-from .assessor import SpatialestClient, _load_registry
+from . import registry as _registry
+from .platforms.spatialest import SpatialestClient
 
 logger = logging.getLogger(__name__)
 
@@ -42,54 +43,40 @@ def _get_client(county, state="co", verbose=False):
 
     Returns (client_instance, registry_entry).
     """
-    registry = _load_registry()
-    key = f"{state.upper()}:{county}"
-    entry = registry.get(key)
+    from .platforms import build_client, _InvalidConfigClient
+    hint = " — check ~/.config/assessor-lookup/county_registry.json"
 
-    if not entry:
-        # Try partial match (e.g. "El Paso" in key)
-        for k, v in registry.items():
-            if county.lower() in k.lower():
-                entry = v
-                break
+    try:
+        entry = _registry.resolve(_registry.load_registry(), county, state)
+    except _registry.AmbiguousJurisdiction as exc:
+        logger.warning("Ambiguous jurisdiction: %s", exc)
+        _, entry = _registry.normalize_entry(
+            f"{state.upper()}:{county}", {"platform": "spatialest"})
+        return _InvalidConfigClient(f"{exc}{hint}"), entry
 
     if not entry:
         # Unknown county: try to auto-discover a source (API-first), and cache
-        # the hit so subsequent lookups skip the probe.
+        # the hit so subsequent lookups skip the probe. Discovery already
+        # returns normalized entries.
         from .discovery import discover_county
-        from .assessor import save_discovered_entry
         entry = discover_county(county, state, verbose=verbose)
         if entry:
             logger.info("Discovered county %s -> %s (tier %s)",
                         county, entry.get("platform"), entry.get("tier"))
-            save_discovered_entry(county, entry, state)
+            _registry.save_discovered_entry(county, entry, state)
 
     if not entry:
         # Last resort: assume Spatialest with the county name as slug.
         slug = county.lower().replace(" ", "")
-        return SpatialestClient(verbose=verbose), {"platform": "spatialest", "slug": slug, "state": state}
+        _, entry = _registry.normalize_entry(
+            f"{state.upper()}:{county}", {"platform": "spatialest", "slug": slug})
 
-    platform = entry.get("platform", "spatialest")
-
-    if platform == "jeffco":
-        from .assessor_jeffco import JeffcoClient
-        return JeffcoClient(timeout=30, verbose=verbose), entry
-    elif platform == "arapahoe":
-        from .assessor_arapahoe import ArapahoeClient
-        return ArapahoeClient(timeout=15, verbose=verbose), entry
-    elif platform == "adams":
-        from .assessor_adams import AdamsClient
-        return AdamsClient(timeout=15, verbose=verbose), entry
-    elif platform == "eagleweb":
-        from .assessor_eagleweb import EagleWebClient
-        return EagleWebClient(base=entry.get("base"), timeout=30,
-                              verbose=verbose), entry
-    elif platform == "co_parcel_api":
-        from .assessor_coparcel import CoParcelClient
-        return CoParcelClient(county=entry.get("county", county), state=state,
-                              timeout=15, verbose=verbose), entry
-    else:
-        return SpatialestClient(timeout=10, verbose=verbose), entry
+    try:
+        return build_client(entry, verbose=verbose), entry
+    except (KeyError, ImportError, AttributeError) as exc:
+        logger.error("Cannot construct client for %s: %s", county, exc)
+        return _InvalidConfigClient(
+            f"invalid registry entry for {county}: {exc}{hint}"), entry
 
 
 def _safe_float(val):
@@ -287,7 +274,9 @@ def check_public_records(subject_data, comps_data, county=None,
                      county, entry.get("platform", "spatialest"))
     else:
         client = SpatialestClient(verbose=verbose)
-        entry = {"platform": "spatialest", "slug": county_slug, "state": state}
+        _, entry = _registry.normalize_entry(
+            f"{state.upper()}:{county_slug}",
+            {"platform": "spatialest", "slug": county_slug})
 
     results = []
     existing_by_label = {
@@ -349,26 +338,13 @@ def check_public_records(subject_data, comps_data, county=None,
             })
             continue
 
-        # Look up on assessor
+        # Look up on assessor (parcel preferred where the platform supports it)
         assessor = None
-        if entry.get("platform") == "spatialest":
-            if parcel_id:
-                assessor = client.lookup_by_parcel(
-                    parcel_id,
-                    county_slug=entry.get("slug", county_slug),
-                    state=state,
-                )
-            if address and (not assessor or assessor.get("status") != "success"):
-                assessor = client.lookup(
-                    lookup_address,
-                    county_slug=entry.get("slug", county_slug),
-                    state=state,
-                )
-        else:
-            if parcel_id and hasattr(client, "lookup_by_parcel"):
-                assessor = client.lookup_by_parcel(parcel_id)
-            if address and (not assessor or assessor.get("status") != "success"):
-                assessor = client.lookup(lookup_address)
+        capabilities = getattr(client, "capabilities", {})
+        if parcel_id and capabilities.get("parcel_lookup"):
+            assessor = client.lookup_by_parcel(parcel_id)
+        if address and (not assessor or assessor.get("status") != "success"):
+            assessor = client.lookup(lookup_address)
 
         if not assessor:
             assessor = {

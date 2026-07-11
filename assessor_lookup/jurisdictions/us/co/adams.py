@@ -1,13 +1,13 @@
-"""Adams County assessor client (ArcGIS REST Feature Services)."""
+"""Adams County, CO jurisdiction driver (ArcGIS REST Feature Services)."""
 
-import json
 import logging
 import urllib.error
 import urllib.parse
-import urllib.request
 
-from .matching import select_candidate
-from .network import open_https, require_https_url
+from ....core.matching import select_candidate
+from ....platforms import arcgis
+
+_esc = arcgis.escape_sql_literal
 
 logger = logging.getLogger(__name__)
 
@@ -16,25 +16,17 @@ PARCELS_URL = f"{BASE_URL}/Parcels/FeatureServer/0/query"
 IMPROVEMENTS_URL = f"{BASE_URL}/Property_Improvements/FeatureServer/0/query"
 VALUES_URL = f"{BASE_URL}/Property_Values/FeatureServer/0/query"
 
+_ALLOWED_HOSTS = ("services3.arcgis.com",)
+
 
 def _arcgis_get(url, params=None, timeout=15):
-    """GET request to ArcGIS REST endpoint, return parsed JSON."""
-    url = require_https_url(url, allowed_hosts=("services3.arcgis.com",))
-    if params:
-        url = f"{url}?{urllib.parse.urlencode(params)}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
-    with open_https(
-            req, timeout=timeout,
-            allowed_hosts=("services3.arcgis.com",)) as resp:
-        return json.loads(resp.read())
+    return arcgis.arcgis_get(url, _ALLOWED_HOSTS, params=params, timeout=timeout)
 
 
 class AdamsClient:
     """Client for Adams County CO assessor (ArcGIS Feature Services)."""
+
+    capabilities = {"parcel_lookup": True, "building_fields": True}
 
     def __init__(self, timeout=15, verbose=False):
         self.timeout = timeout
@@ -102,7 +94,7 @@ class AdamsClient:
         # Try parcelnb (string field) first, then PIN as fallback
         for field in ("parcelnb", "PARCELNB", "PIN", "pin"):
             result = _arcgis_get(PARCELS_URL, params={
-                "where": f"{field}='{parcel_id}'",
+                "where": f"{field}='{_esc(parcel_id)}'",
                 "outFields": "*",
                 "returnGeometry": "false",
                 "resultRecordCount": "1",
@@ -277,7 +269,7 @@ class AdamsClient:
     def _query_improvements(self, pin):
         """Query Property_Improvements by PIN. Return attributes dict."""
         result = _arcgis_get(IMPROVEMENTS_URL, params={
-            "where": f"pin='{pin}'",
+            "where": f"pin='{_esc(pin)}'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -291,7 +283,7 @@ class AdamsClient:
     def _query_values(self, pin):
         """Query Property_Values by PIN. Return attributes dict."""
         result = _arcgis_get(VALUES_URL, params={
-            "where": f"pin='{pin}'",
+            "where": f"pin='{_esc(pin)}'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -330,3 +322,8 @@ def _format_currency(value):
         return f"${float(str(value).replace(',', '')):,.0f}"
     except (ValueError, TypeError):
         return str(value)
+
+
+def build(entry, timeout=15, verbose=False):
+    """Driver factory used by the arcgis platform dispatcher."""
+    return AdamsClient(timeout=timeout, verbose=verbose)

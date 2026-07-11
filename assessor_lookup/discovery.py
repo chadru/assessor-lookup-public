@@ -13,9 +13,11 @@ ordered best-data-first:
   Tier 2 — baseline parcel API (owner/legal/value/land, NO building data):
     * CO statewide public-parcel ArcGIS layer                  (Colorado only)
 
-Nothing here writes to disk; callers decide whether to persist a hit (see
-``assessor.save_discovered_entry``). Probes are cheap HEAD/GET requests with a
-short timeout and fail closed (a probe error just means "not this platform").
+Hits are returned as *normalized* registry entries (canonical jurisdiction +
+platform + config). Nothing here writes to disk; callers decide whether to
+persist a hit (see ``registry.save_discovered_entry``). Probes are cheap
+HEAD/GET requests with a short timeout and fail closed (a probe error just
+means "not this platform").
 """
 
 import re
@@ -23,7 +25,7 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .network import open_https, require_https_url
+from .core.network import open_https, require_https_url
 
 _UA = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36"}
 
@@ -133,6 +135,8 @@ def discover_county(county, state="co", timeout=8, verbose=False):
         except Exception:  # noqa: BLE001
             entry = None
         if entry:
+            from .registry import normalize_entry
+            _, entry = normalize_entry(f"{state.upper()}:{county}", entry)
             if verbose:
                 tier = entry.get("tier")
                 print(f"  discovered {county} -> {entry['platform']} (tier {tier})")

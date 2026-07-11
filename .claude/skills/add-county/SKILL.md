@@ -22,14 +22,17 @@ client module + one registry entry + one golden case).
    year) are available. Honor its verdict: prefer a JSON API; scrape only if no
    API carries the building data.
 
-3. **Implement the client** `assessor_lookup/assessor_<slug>.py`: a class whose
+3. **Implement the client** at `platforms/<name>.py` (config-driven platform)
+   or `jurisdictions/<country>/<state>/<name>.py` (bespoke driver exposing
+   `build(entry, timeout=, verbose=)`): a class whose
    `lookup(address)` (and ideally `lookup_by_parcel(parcel_id)`) returns the
    standard record dict with a `status` key, never raising on failure. Mirror
-   the closest existing client: `assessor_adams.py` (ArcGIS JSON), `assessor.py`
-   (Spatialest JSON), or `assessor_eagleweb.py` (scrape).
+   the closest existing client: `jurisdictions/us/co/adams.py` (ArcGIS JSON), `platforms/spatialest.py`
+   (Spatialest JSON), or `platforms/eagleweb.py` (scrape).
 
-4. **Wire it in.** Add the platform branch to `checker._get_client` and a
-   `county_registry.json` entry (`{"platform": "...", ...}`).
+4. **Wire it in.** For a new platform, add one line to the `PLATFORMS` dict
+   in `platforms/__init__.py`; then add the `county_registry.json` entry
+   (a config-only jurisdiction needs just the entry).
 
 5. **Pin a golden.** Add a case to `DEFAULT_CASES` in `assessor_lookup/harness.py`, then
    `python tests/harness.py --capture --filter <case-id>`. Use a real

@@ -7,8 +7,8 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .matching import normalize_identifier, select_candidate
-from .network import open_https, require_https_url
+from ..core.matching import normalize_identifier, select_candidate
+from ..core.network import open_https, require_https_url
 
 logger = logging.getLogger(__name__)
 
@@ -31,17 +31,16 @@ def _format_fractional_value(value):
     return text
 
 
-def _jeffco_get(url, timeout=10):
-    """GET request to Jeffco Aumentum API, return parsed JSON."""
-    url = require_https_url(url, allowed_hosts=("propertysearch.jeffco.us",))
+def _jeffco_get(url, timeout=10, allowed_hosts=("propertysearch.jeffco.us",)):
+    """GET request to an Aumentum API, return parsed JSON."""
+    url = require_https_url(url, allowed_hosts=allowed_hosts)
     headers = {
         "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
         "Accept": "application/json",
     }
     req = urllib.request.Request(url, headers=headers, method="GET")
     with open_https(
-            req, timeout=timeout,
-            allowed_hosts=("propertysearch.jeffco.us",)) as resp:
+            req, timeout=timeout, allowed_hosts=allowed_hosts) as resp:
         return json.loads(resp.read())
 
 
@@ -73,9 +72,15 @@ def _parse_address(address):
 
 
 class JeffcoClient:
-    """Client for Jefferson County CO assessor (Aumentum platform)."""
+    """Aumentum platform client. Jefferson County, CO is the default (and
+    first) deployment; another Aumentum county supplies its own ``base``."""
 
-    def __init__(self, timeout=10, verbose=False):
+    capabilities = {"parcel_lookup": True, "building_fields": True}
+
+    def __init__(self, base=None, timeout=10, verbose=False):
+        self.base_url = require_https_url((base or BASE_URL).rstrip("/"))
+        self._allowed_hosts = (
+            urllib.parse.urlsplit(self.base_url).hostname,)
         self.timeout = timeout
         self.verbose = verbose
 
@@ -99,12 +104,12 @@ class JeffcoClient:
             "Skip": "0",
             "Take": "10",
         })
-        search_url = f"{BASE_URL}/address?{params}"
+        search_url = f"{self.base_url}/address?{params}"
 
         try:
             if self.verbose:
                 logger.info("Jeffco search: %s", search_url)
-            result = _jeffco_get(search_url, timeout=self.timeout)
+            result = _jeffco_get(search_url, timeout=self.timeout, allowed_hosts=self._allowed_hosts)
         except urllib.error.URLError as e:
             if "timed out" in str(e).lower():
                 return {"status": "timeout", "address": address, "error": str(e)}
@@ -309,9 +314,9 @@ class JeffcoClient:
 
     def _get_endpoint(self, path):
         """Fetch a Jeffco API endpoint, return parsed JSON or empty dict."""
-        url = f"{BASE_URL}/{path}"
+        url = f"{self.base_url}/{path}"
         try:
-            return _jeffco_get(url, timeout=self.timeout)
+            return _jeffco_get(url, timeout=self.timeout, allowed_hosts=self._allowed_hosts)
         except Exception as e:
             if self.verbose:
                 logger.warning("Jeffco endpoint %s failed: %s", path, e)
