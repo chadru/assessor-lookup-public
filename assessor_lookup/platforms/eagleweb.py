@@ -26,10 +26,10 @@ import urllib.error
 import urllib.parse
 import urllib.request
 
-from .network import build_https_opener, require_https_url
+from ..core.network import build_https_opener, require_https_url
 import http.cookiejar
 
-from .matching import normalize_address, normalize_identifier
+from ..core.matching import normalize_address, normalize_identifier
 
 _UA = ("Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
        "(KHTML, like Gecko) Chrome/120.0 Safari/537.36")
@@ -104,6 +104,8 @@ def _to_float(text):
 
 class EagleWebClient:
     """Client for Tyler EagleWeb / taxweb public assessor search."""
+
+    capabilities = {"parcel_lookup": True, "building_fields": True}
 
     def __init__(self, base=None, timeout=30, verbose=False):
         # base ends at the app root, e.g. ".../eagleassessor"

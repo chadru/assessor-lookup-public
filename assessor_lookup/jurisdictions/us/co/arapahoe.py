@@ -1,13 +1,13 @@
-"""Arapahoe County assessor client (ArcGIS REST API)."""
+"""Arapahoe County, CO jurisdiction driver (ArcGIS REST MapServer)."""
 
-import json
 import logging
 import urllib.error
 import urllib.parse
-import urllib.request
 
-from .matching import select_candidate
-from .network import open_https, require_https_url
+from ....core.matching import select_candidate
+from ....platforms import arcgis
+
+_esc = arcgis.escape_sql_literal
 
 logger = logging.getLogger(__name__)
 
@@ -19,25 +19,17 @@ BUILDING_LAYER_URL = f"{BASE_URL}/ArapaMAP/MapServer/286/query"     # Land and M
 IMPROVEMENTS_LAYER_URL = f"{BASE_URL}/ArapaMAP/MapServer/167/query" # Parcel Improvements
 SUBDIVISION_LAYER_URL = f"{BASE_URL}/ArapaMAP/MapServer/151/query"  # Subdivisions
 
+_ALLOWED_HOSTS = ("gis.arapahoegov.com",)
+
 
 def _arcgis_get(url, params=None, timeout=15):
-    """GET request to ArcGIS REST endpoint, return parsed JSON."""
-    url = require_https_url(url, allowed_hosts=("gis.arapahoegov.com",))
-    if params:
-        url = f"{url}?{urllib.parse.urlencode(params)}"
-    headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
-        "Accept": "application/json",
-    }
-    req = urllib.request.Request(url, headers=headers, method="GET")
-    with open_https(
-            req, timeout=timeout,
-            allowed_hosts=("gis.arapahoegov.com",)) as resp:
-        return json.loads(resp.read())
+    return arcgis.arcgis_get(url, _ALLOWED_HOSTS, params=params, timeout=timeout)
 
 
 class ArapahoeClient:
     """Client for Arapahoe County CO assessor (ArcGIS platform)."""
+
+    capabilities = {"parcel_lookup": True, "building_fields": True}
 
     def __init__(self, timeout=15, verbose=False):
         self.timeout = timeout
@@ -202,7 +194,7 @@ class ArapahoeClient:
     def _fetch_parcel_by_id(self, parcel_id):
         """Query Layer 276 directly by PARCEL_ID. Return attributes dict."""
         result = _arcgis_get(PARCEL_LAYER_URL, params={
-            "where": f"PARCEL_ID='{parcel_id}'",
+            "where": f"PARCEL_ID='{_esc(parcel_id)}'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -335,7 +327,7 @@ class ArapahoeClient:
     def _query_building(self, parcel_id):
         """Query Layer 286 for building data by PARCEL_ID. Return attributes dict."""
         result = _arcgis_get(BUILDING_LAYER_URL, params={
-            "where": f"PARCEL_ID='{parcel_id}'",
+            "where": f"PARCEL_ID='{_esc(parcel_id)}'",
             "outFields": "PARCEL_ID,Yr_Built,Heated_Area,Basement,Basement_Fin,"
                          "Att_Garage,Quality,Bld_Style,NBHD_Code,"
                          "Market_Val,Sale_Date,Sale_Price",
@@ -356,7 +348,7 @@ class ArapahoeClient:
         feature returned a neighbor's owner.
         """
         result = _arcgis_get(OWNER_LAYER_URL, params={
-            "where": f"PARCEL_ID='{parcel_id}'",
+            "where": f"PARCEL_ID='{_esc(parcel_id)}'",
             "outFields": "*",
             "returnGeometry": "false",
             "f": "json",
@@ -372,7 +364,7 @@ class ArapahoeClient:
     def _query_improvements(self, parcel_id):
         """Query Layer 167 for legal description by PARCEL_ID."""
         result = _arcgis_get(IMPROVEMENTS_LAYER_URL, params={
-            "where": f"PARCEL_ID='{parcel_id}'",
+            "where": f"PARCEL_ID='{_esc(parcel_id)}'",
             "outFields": "PARCEL_ID,Legal_Desc,Plat_Override,AIN",
             "returnGeometry": "false",
             "f": "json",
@@ -430,3 +422,8 @@ def _safe_int(val):
         return int(float(str(val).replace(",", "").strip()))
     except (ValueError, TypeError):
         return None
+
+
+def build(entry, timeout=15, verbose=False):
+    """Driver factory used by the arcgis platform dispatcher."""
+    return ArapahoeClient(timeout=timeout, verbose=verbose)

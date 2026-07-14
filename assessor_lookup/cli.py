@@ -40,11 +40,11 @@ def _cmd_lookup(args):
 
 
 def _cmd_counties(args):
-    from .assessor import _load_registry
+    from .registry import load_registry as _load_registry
     registry = _load_registry()
-    print(f"{'County':<20} {'Platform'}")
+    print(f"{'Jurisdiction':<34} {'Platform'}")
     for key, entry in sorted(registry.items()):
-        print(f"{key:<20} {entry.get('platform', 'spatialest')}")
+        print(f"{key:<34} {entry.get('platform', 'spatialest')}")
     print("\nCounties not listed fall back to Spatialest with the county "
           "name as slug — many Spatialest counties work out of the box.")
     return 0
@@ -73,7 +73,7 @@ def _cmd_check(args):
 
 def _cmd_discover(args):
     from .discovery import discover_county
-    from .assessor import save_discovered_entry
+    from .registry import save_discovered_entry
     entry = discover_county(args.county, args.state, verbose=True)
     if not entry:
         print(f"No supported assessor source found for {args.county}, "

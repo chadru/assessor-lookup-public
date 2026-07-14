@@ -285,12 +285,16 @@ New counties and platforms are welcome. To add a county:
 2. If not, **look for a JSON API first** (county/state ArcGIS, or a vendor JSON
    platform). Confirm it carries the building fields (GLA/beds/baths/year) — if
    it doesn't, scrape the assessor's HTML front-end instead.
-3. Add a client `assessor_<county>.py` whose `lookup(address)` (and ideally
-   `lookup_by_parcel(parcel_id)`) returns the standard record dict with a
-   `status` key. `assessor_adams.py` is a compact ArcGIS example;
-   `assessor_eagleweb.py` is the reference for a scraped platform.
-4. Wire the platform into `checker._get_client` and add a
-   `county_registry.json` entry.
+3. If it's on a config-driven platform (Spatialest, EagleWeb, Aumentum), a
+   `county_registry.json` entry is all it takes — no code. For a bespoke
+   ArcGIS flow, add a driver at `jurisdictions/<country>/<state>/<name>.py`
+   exposing `build(entry, timeout=, verbose=)` and reference it from the
+   entry's `config.driver` (`jurisdictions/us/co/adams.py` is a compact
+   example). For a brand-new platform, add one module in `platforms/` whose
+   client returns the standard record dict with a `status` key
+   (`platforms/eagleweb.py` is the reference for a scraped platform).
+4. Register a new platform with one line in the `PLATFORMS` dict in
+   `platforms/__init__.py`, and add the `county_registry.json` entry.
 5. Add a golden case in `assessor_lookup/harness.py` and capture it
    (`python tests/harness.py --capture --filter <id>`), then confirm
    `pytest -m "not network"` is green.

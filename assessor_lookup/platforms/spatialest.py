@@ -5,67 +5,9 @@ import re
 import urllib.error
 import urllib.parse
 import urllib.request
-from pathlib import Path
 
-from .matching import normalize_address, normalize_identifier, select_candidate
-from .network import build_https_opener, open_https, require_https_url
-
-
-# Load county registry
-_REGISTRY_PATH = Path(__file__).parent / "county_registry.json"
-
-
-def _user_registry_path():
-    """Path to the per-user registry where discovered counties are cached.
-
-    Honors ASSESSOR_LOOKUP_HOME, else ~/.config/assessor-lookup/.
-    """
-    import os
-    root = os.environ.get("ASSESSOR_LOOKUP_HOME")
-    base = Path(root) if root else Path.home() / ".config" / "assessor-lookup"
-    return base / "county_registry.json"
-
-
-def _load_registry():
-    """Load the county registry (packaged defaults + user-discovered counties).
-
-    The user registry (auto-discovered counties) is merged over the packaged
-    one, so a discovered or hand-edited county wins over the default.
-    """
-    registry = {}
-    if _REGISTRY_PATH.exists():
-        with open(_REGISTRY_PATH) as f:
-            registry = json.load(f)
-    user_path = _user_registry_path()
-    if user_path.exists():
-        try:
-            with open(user_path) as f:
-                registry.update(json.load(f))
-        except (ValueError, OSError):
-            pass  # a corrupt user cache must never break lookups
-    return registry
-
-
-def save_discovered_entry(county, entry, state="co"):
-    """Persist a discovered registry entry to the per-user registry.
-
-    Returns the registry key written. Failures are swallowed (caching is a
-    convenience, not a requirement).
-    """
-    key = f"{state.upper()}:{county}"
-    path = _user_registry_path()
-    try:
-        path.parent.mkdir(parents=True, exist_ok=True)
-        data = {}
-        if path.exists():
-            with open(path) as f:
-                data = json.load(f)
-        data[key] = entry
-        with open(path, "w") as f:
-            json.dump(data, f, indent=2, sort_keys=True)
-    except (OSError, ValueError):
-        pass
-    return key
+from ..core.matching import normalize_address, normalize_identifier, select_candidate
+from ..core.network import build_https_opener, open_https, require_https_url
 
 
 def _spatialest_request(url, data=None, timeout=10):
@@ -250,11 +192,16 @@ def _looks_like_taxing_authority(value):
 class SpatialestClient:
     """Client for the free Spatialest county assessor API."""
 
-    def __init__(self, timeout=10, verbose=False):
+    capabilities = {"parcel_lookup": True, "building_fields": True}
+
+    def __init__(self, timeout=10, verbose=False, county_slug="elpaso",
+                 state="co"):
         self.timeout = timeout
         self.verbose = verbose
+        self.county_slug = county_slug
+        self.state = state
 
-    def lookup(self, address, county_slug="elpaso", state="co"):
+    def lookup(self, address, county_slug=None, state=None):
         """Look up a property on the county assessor.
 
         Args:
@@ -268,6 +215,8 @@ class SpatialestClient:
             style, assessor_url. Status is "success", "not_found",
             "timeout", "api_error", or "parse_error".
         """
+        county_slug = county_slug or self.county_slug
+        state = state or self.state
         address = (address or "").strip()
         if not address:
             return {"status": "invalid_address", "address": address}
@@ -336,13 +285,15 @@ class SpatialestClient:
             return {"status": "parse_error", "address": address,
                     "error": str(e)}
 
-    def lookup_by_parcel(self, parcel_id, county_slug="elpaso", state="co"):
+    def lookup_by_parcel(self, parcel_id, county_slug=None, state=None):
         """Look up a property on Spatialest by parcel/schedule number.
 
         Spatialest's search endpoint accepts free-text terms, so we
         pass the parcel_id as the term and then fetch the record card
         the same way `lookup()` does.
         """
+        county_slug = county_slug or self.county_slug
+        state = state or self.state
         parcel_id = (parcel_id or "").strip()
         if not parcel_id:
             return {"status": "invalid_parcel", "parcel_id": parcel_id}

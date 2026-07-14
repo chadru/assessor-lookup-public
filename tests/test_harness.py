@@ -240,3 +240,106 @@ class TestOnboarding:
             [{"id": "elpaso-address", "county": "El Paso", "state": "co"}]))
         ids = [c["id"] for c in load_cases()]
         assert ids.count("elpaso-address") == 1
+
+
+class TestTransientRetry:
+    """Live-case runner retries transient failures, never value mismatches."""
+
+    def _fake_lookup(self, script):
+        calls = []
+
+        def fake(**kwargs):
+            calls.append(kwargs)
+            return script[min(len(calls), len(script)) - 1]
+
+        return fake, calls
+
+    def test_retries_timeout_then_succeeds(self, monkeypatch):
+        import assessor_lookup
+        fake, calls = self._fake_lookup([
+            {"status": "timeout", "error": "timed out"},
+            {"status": "api_error", "error": "handshake"},
+            {"status": "success", "parcel_number": "1"},
+        ])
+        monkeypatch.setattr(assessor_lookup, "lookup", fake)
+        out = harness.run_lookup_case({"id": "x", "county": "El Paso"},
+                                      retry_delay=0)
+        assert out["status"] == "success"
+        assert len(calls) == 3
+
+    def test_success_is_not_retried(self, monkeypatch):
+        import assessor_lookup
+        fake, calls = self._fake_lookup([{"status": "success"}])
+        monkeypatch.setattr(assessor_lookup, "lookup", fake)
+        harness.run_lookup_case({"id": "x", "county": "El Paso"}, retry_delay=0)
+        assert len(calls) == 1
+
+    def test_not_found_is_not_retried(self, monkeypatch):
+        # A definitive answer (even a bad one) must not be retried —
+        # only transport-level transients are.
+        import assessor_lookup
+        fake, calls = self._fake_lookup([{"status": "not_found"}])
+        monkeypatch.setattr(assessor_lookup, "lookup", fake)
+        out = harness.run_lookup_case({"id": "x", "county": "El Paso"},
+                                      retry_delay=0)
+        assert out["status"] == "not_found"
+        assert len(calls) == 1
+
+    def test_gives_up_after_three_attempts(self, monkeypatch):
+        import assessor_lookup
+        fake, calls = self._fake_lookup([{"status": "timeout", "error": "t"}])
+        monkeypatch.setattr(assessor_lookup, "lookup", fake)
+        out = harness.run_lookup_case({"id": "x", "county": "El Paso"},
+                                      retry_delay=0)
+        assert out["status"] == "timeout"
+        assert len(calls) == 3
+
+
+    def test_exception_becomes_harness_error_single_attempt(self, monkeypatch):
+        # A raised exception is a definitive in-code failure, not a transport
+        # transient — deliberately NOT retried.
+        import assessor_lookup
+        calls = []
+
+        def boom(**kwargs):
+            calls.append(1)
+            raise RuntimeError("boom")
+
+        monkeypatch.setattr(assessor_lookup, "lookup", boom)
+        out = harness.run_lookup_case({"id": "x", "county": "El Paso"},
+                                      retry_delay=0)
+        assert out["status"] == "harness_error"
+        assert len(calls) == 1
+
+
+class TestPlatformLabels:
+    """Harness platform labels use true platform names (+ arcgis driver)."""
+
+    def test_platform_label_plain(self):
+        assert harness.platform_label({"platform": "aumentum",
+                                       "config": {}}) == "aumentum"
+
+    def test_platform_label_includes_arcgis_driver(self):
+        entry = {"platform": "arcgis", "config": {"driver": "us.co.adams"}}
+        assert harness.platform_label(entry) == "arcgis/us.co.adams"
+
+    def test_packaged_golden_labels_map_to_registered_platforms(self):
+        from assessor_lookup.platforms import PLATFORMS
+        golden = json.loads(GOLDEN_PATH.read_text())
+        assert golden, "packaged goldens must not be empty"
+        for case_id, entry in golden.items():
+            assert entry["platform"].split("/")[0] in PLATFORMS, case_id
+
+    def test_capture_writes_true_platform_labels(self, monkeypatch):
+        import assessor_lookup.checker as checker
+        monkeypatch.setattr(harness, "run_lookup_case",
+                            lambda case, **kw: {"status": "success",
+                                                "elapsed_s": 1.0,
+                                                "record": {"parcel_number": "1"}})
+        entry = {"platform": "arcgis", "config": {"driver": "us.co.adams"},
+                 "jurisdiction": {"country": "US", "state": "CO",
+                                  "kind": "county", "name": "Adams"}}
+        monkeypatch.setattr(checker, "_get_client",
+                            lambda county, state="co", verbose=False: (None, entry))
+        golden = harness.capture_golden([{"id": "x", "county": "Adams"}], delay=0)
+        assert golden["x"]["platform"] == "arcgis/us.co.adams"

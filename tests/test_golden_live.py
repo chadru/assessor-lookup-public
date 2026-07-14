@@ -10,6 +10,8 @@ A failure here means a county website changed (or the parser broke) — run
 ``--capture`` if the underlying property data legitimately changed.
 """
 
+import time
+
 import pytest
 
 from assessor_lookup.harness import (
@@ -40,10 +42,28 @@ def test_golden_case(case):
         f"parser regressed; if the data is legitimately different, re-capture.")
 
 
+def _discover_with_retry(county, state, want_platform, attempts=3):
+    """Discovery probes are fail-closed with short timeouts; a transiently
+    slow endpoint must not read as a ladder regression. A real regression
+    fails all attempts."""
+    from assessor_lookup.discovery import discover_county
+    entry = None
+    for attempt in range(attempts):
+        entry = discover_county(county, state)
+        if entry and entry.get("platform") == want_platform:
+            return entry
+        time.sleep(2)
+    return entry
+
+
 @pytest.mark.network
 def test_discovery_ladder_live():
     from assessor_lookup.discovery import discover_county
-    assert discover_county("Clear Creek", "co")["platform"] == "eagleweb"
-    assert discover_county("El Paso", "co")["platform"] == "spatialest"
-    assert discover_county("Boulder", "co")["platform"] == "co_parcel_api"
+    assert _discover_with_retry("Clear Creek", "co", "eagleweb")[
+        "platform"] == "eagleweb"
+    assert _discover_with_retry("El Paso", "co", "spatialest")[
+        "platform"] == "spatialest"
+    boulder = _discover_with_retry("Boulder", "co", "arcgis")
+    assert boulder["platform"] == "arcgis"
+    assert boulder["config"]["driver"] == "us.co.statewide"
     assert discover_county("Notacounty", "co") is None

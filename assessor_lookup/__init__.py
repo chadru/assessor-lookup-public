@@ -51,20 +51,13 @@ def lookup(address=None, county="El Paso", state="co", parcel=None,
         raise ValueError("Provide an address or a parcel number")
 
     client, entry = _get_client(county, state, verbose=verbose)
-    slug = entry.get("slug", "")
+    capabilities = getattr(client, "capabilities", {})
 
     result = None
-    if parcel:
-        if entry.get("platform", "spatialest") == "spatialest":
-            result = client.lookup_by_parcel(parcel, county_slug=slug,
-                                             state=state)
-        elif hasattr(client, "lookup_by_parcel"):
-            result = client.lookup_by_parcel(parcel)
+    if parcel and capabilities.get("parcel_lookup"):
+        result = client.lookup_by_parcel(parcel)
     if address and (not result or result.get("status") != "success"):
-        if entry.get("platform", "spatialest") == "spatialest":
-            result = client.lookup(address, county_slug=slug, state=state)
-        else:
-            result = client.lookup(address)
+        result = client.lookup(address)
     return result or {"status": "invalid_address",
                       "error": "No address or supported parcel lookup"}
 

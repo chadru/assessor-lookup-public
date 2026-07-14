@@ -55,7 +55,7 @@ class TestToolsOffline:
     def test_list_counties(self):
         out = _tool_json(_run(srv.mcp.call_tool("list_counties", {})))
         assert out["count"] >= 7
-        assert "CO:Clear Creek" in out["counties"]
+        assert "US/CO/county:clear-creek" in out["counties"]
 
     def test_lookup_requires_input(self):
         out = _tool_json(_run(srv.mcp.call_tool(
@@ -150,7 +150,7 @@ class TestResourcesOffline:
         content = _run(srv.mcp.read_resource("assessor://counties"))
         block = content[0]
         data = json.loads(block.content)
-        assert "CO:Clear Creek" in data
+        assert "US/CO/county:clear-creek" in data
 
     def test_operating_manual_mentions_workflow(self):
         content = _run(srv.mcp.read_resource("assessor://operating-manual"))

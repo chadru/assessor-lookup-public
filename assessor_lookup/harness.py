@@ -80,6 +80,8 @@ DEFAULT_CASES = [
     {"id": "douglas-parcel", "county": "Douglas", "state": "co",
      "parcel": "R0404064", "address": "100 Third St",
      "fixture_type": "institutional"},
+    {"id": "denver-address", "county": "Denver", "state": "co",
+     "address": "10 W 14th Ave Pkwy", "fixture_type": "institutional"},
     {"id": "jeffco-address", "county": "Jefferson", "state": "co",
      "address": "8101 Ralston Rd", "fixture_type": "institutional"},
     {"id": "arapahoe-address", "county": "Arapahoe", "state": "co",
@@ -102,7 +104,7 @@ DEFAULT_CASES = [
 DISCOVERY_CASES = [
     {"county": "Clear Creek", "state": "co", "platform": "eagleweb"},
     {"county": "El Paso", "state": "co", "platform": "spatialest"},
-    {"county": "Boulder", "state": "co", "platform": "co_parcel_api"},
+    {"county": "Boulder", "state": "co", "platform": "arcgis"},
     {"county": "Notacounty", "state": "co", "platform": None},
 ]
 
@@ -150,18 +152,39 @@ def compare_record(expected, actual):
 # --------------------------------------------------------------------------
 # runners
 # --------------------------------------------------------------------------
-def run_lookup_case(case, timeout_note=None):
+# Transport-level statuses worth retrying. Definitive answers (not_found,
+# ambiguous, value mismatches) are never retried — a golden FAIL must mean
+# "the parser broke or the world changed", not "the endpoint hiccuped".
+_TRANSIENT_STATUSES = {"timeout", "api_error"}
+
+
+def run_lookup_case(case, timeout_note=None, attempts=3, retry_delay=2.0):
     """Run one golden case live. Returns {status, elapsed_s, record}."""
-    from assessor_lookup import lookup
-    t0 = time.monotonic()
-    try:
-        rec = lookup(address=case.get("address"), parcel=case.get("parcel"),
-                     county=case["county"], state=case.get("state", "co"))
-    except Exception as e:  # noqa: BLE001 — harness must never crash mid-run
-        rec = {"status": "harness_error", "error": f"{type(e).__name__}: {e}"}
-    elapsed = time.monotonic() - t0
+    import assessor_lookup
+    rec, elapsed = {}, 0.0
+    for attempt in range(attempts):
+        t0 = time.monotonic()
+        try:
+            rec = assessor_lookup.lookup(
+                address=case.get("address"), parcel=case.get("parcel"),
+                county=case["county"], state=case.get("state", "co"))
+        except Exception as e:  # noqa: BLE001 — harness must never crash mid-run
+            rec = {"status": "harness_error", "error": f"{type(e).__name__}: {e}"}
+        elapsed = time.monotonic() - t0
+        if rec.get("status") not in _TRANSIENT_STATUSES:
+            break
+        if attempt < attempts - 1:
+            time.sleep(retry_delay)
     return {"status": rec.get("status", "unknown"), "elapsed_s": round(elapsed, 2),
             "record": rec}
+
+
+def platform_label(entry):
+    """Benchmark/golden label for a registry entry: the true platform name,
+    with the driver appended for ArcGIS so per-source latency stays visible."""
+    platform = entry.get("platform", "?")
+    driver = entry.get("config", {}).get("driver")
+    return f"{platform}/{driver}" if driver else platform
 
 
 def run_regression(cases, golden, delay=0.5, progress=print):
@@ -226,8 +249,8 @@ def run_discovery_checks(progress=print):
 
 def run_parser_bench(iterations=200, progress=print):
     """Micro-benchmark the HTML/JSON parsers on canned fixtures (offline)."""
-    from assessor_lookup.assessor import SpatialestClient
-    from assessor_lookup.assessor_eagleweb import EagleWebClient
+    from assessor_lookup.platforms.spatialest import SpatialestClient
+    from assessor_lookup.platforms.eagleweb import EagleWebClient
 
     spat_card = {"parcel": {
         "header": {"marketvalueheader": "$350,000", "par": "R0000001",
@@ -310,7 +333,7 @@ def capture_golden(cases, delay=0.5, progress=print):
             if field in rec:
                 expect[field] = rec[field]
         golden[case["id"]] = {
-            "platform": entry.get("platform", "?"),
+            "platform": platform_label(entry),
             "captured_at": datetime.now(timezone.utc).isoformat(timespec="seconds"),
             "elapsed_s": out["elapsed_s"],
             "expect": expect,
@@ -323,7 +346,7 @@ def capture_golden(cases, delay=0.5, progress=print):
 
 def _user_dir():
     """Per-user config dir (same one the registry cache uses)."""
-    from assessor_lookup.assessor import _user_registry_path
+    from assessor_lookup.registry import _user_registry_path
     path = _user_registry_path().parent
     path.mkdir(parents=True, exist_ok=True, mode=0o700)
     path.chmod(0o700)
@@ -409,7 +432,7 @@ def probe_coverage(county, state="co", address="", parcel=""):
     result = {"county": county, "state": state}
     try:
         _, entry = _get_client(county, state)
-        result["platform"] = entry.get("platform")
+        result["platform"] = platform_label(entry)
         result["tier"] = entry.get("tier")
     except Exception as e:  # noqa: BLE001
         result["platform"] = None
