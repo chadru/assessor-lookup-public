@@ -169,11 +169,17 @@ ASSESSOR_LOOKUP_MCP_DATA_DIR=/path/to/mls assessor-lookup-mcp
 Resolved paths and symlinks are kept inside that directory. Do not expose the
 stdio server through an unauthenticated HTTP/SSE bridge.
 
-Register it with Claude Code (or drop the bundled `.mcp.json` into your project
-— Claude Code auto-discovers it):
+### Hooking it up to Claude Code
+
+In this repo, nothing to register: Claude Code auto-discovers the bundled
+`.mcp.json` at session startup — install the `[mcp]` extra, restart the
+session, and approve the server when prompted (`/mcp` shows its status).
+
+In any other project, register it per-project or user-wide:
 
 ```bash
 claude mcp add assessor-lookup -- assessor-lookup-mcp
+claude mcp add --scope user assessor-lookup -- assessor-lookup-mcp
 ```
 
 What the agent gets on connect:

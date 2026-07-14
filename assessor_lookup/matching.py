@@ -52,10 +52,47 @@ def _attributes(candidate):
 
 
 def _values(candidate, fields):
-    attrs = _attributes(candidate)
-    return [value for key, value in attrs.items()
+    """Collect identity values from a candidate's attributes AND top level.
+
+    ArcGIS geocoders put identity fields ("address", "score") at the top
+    level next to an often-empty "attributes" dict; feature queries nest
+    everything under "attributes". Merge both views, attributes winning.
+    """
+    if not isinstance(candidate, dict):
+        return []
+    merged = {k: v for k, v in candidate.items() if k != "attributes"}
+    attrs = candidate.get("attributes")
+    if isinstance(attrs, dict):
+        merged.update(attrs)
+    return [value for key, value in merged.items()
             if str(key).lower().replace(" ", "").replace("-", "") in fields
             and value not in (None, "")]
+
+
+def _collapse_duplicate_matches(matches):
+    """Return one representative when every match is the same identity.
+
+    Composite geocoders return the same address once per underlying
+    locator; those duplicates are not ambiguity. Matches exposing two or
+    more distinct parcel identifiers are genuinely ambiguous (different
+    parcels sharing a situs address) and are never collapsed.
+    """
+    parcel_ids = {normalize_identifier(value)
+                  for match in matches
+                  for value in _values(match, _PARCEL_FIELDS)}
+    if len(parcel_ids) > 1:
+        return None
+
+    def _score(match):
+        value = match.get("score")
+        if value is None:
+            value = _attributes(match).get("score")
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            return 0.0
+
+    return max(matches, key=_score)
 
 
 def select_candidate(candidates, *, address="", parcel=""):
@@ -89,6 +126,9 @@ def select_candidate(candidates, *, address="", parcel=""):
     if len(matches) == 1:
         return matches[0], "success"
     if len(matches) > 1:
+        collapsed = _collapse_duplicate_matches(matches)
+        if collapsed is not None:
+            return collapsed, "success"
         return None, "ambiguous"
     if len(usable) == 1 and not candidates_with_identity:
         return usable[0], "success"
