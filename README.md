@@ -17,12 +17,12 @@ your MLS export (subject + comps) and prints a field-by-field discrepancy
 report (GLA, beds, baths, year built, basement sqft) in seconds instead of a
 county-website tab per property.
 
-```
-Comp 2: 123 Example Ave  **
-  GLA:      MLS 2792     | Assessor 2846     | DIFF +54
-  Beds:     MLS 4        | Assessor 4        | OK
-  Year:     MLS 1998     | Assessor 1998     | OK
-```
+![assessor-lookup checking six comps against live El Paso County records — flagging GLA, bath, and basement discrepancies](docs/demo.gif)
+
+*The numbers are from a real run against live El Paso County records
+(addresses fictionalized). That +893 GLA flag is a tri-level whose lower level
+the MLS counted as basement — the kind of miss that walks straight into your
+adjustment grid.*
 
 ## Features
 
